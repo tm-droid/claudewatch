@@ -48,7 +48,7 @@ struct ClaudeWatchApp: App {
             // No onOpenURL pairing here: a tapped link must never silently re-point the watch at another relay.
             // Pairing arrives from the iPhone app (which confirms it) or a link pasted by hand.
         }
-        .onChange(of: phase) { _, p in
+        .onChange(of: phase, initial: true) { _, p in
             switch p {
             case .active: model.resume()
             case .background: model.pause()

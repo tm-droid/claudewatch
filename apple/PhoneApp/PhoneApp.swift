@@ -40,7 +40,7 @@ struct ClaudeWatchPhoneApp: App {
                 if let p = model.pairing { PairingSync.shared.send(p) }
             }
         }
-        .onChange(of: phase) { _, p in
+        .onChange(of: phase, initial: true) { _, p in
             switch p {
             case .active: model.resume()
             case .background: model.pause()
@@ -122,7 +122,7 @@ struct PhoneHomeView: View {
                 Section("Needs you") {
                     ForEach(model.permissions) { p in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(p.project ?? "") · \(p.tool)").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                            Text([p.project ?? "", p.tool].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption.weight(.semibold)).foregroundStyle(.orange)
                             Text(p.detail.isEmpty ? p.summary : p.detail).font(.system(.footnote, design: .monospaced))
                             if p.remote {
                                 HStack {
