@@ -56,3 +56,15 @@ private func fixture(_ name: String) throws -> Data {
     m.handle(SSEMessage(event: "permission_resolved", data: #"{"id":"p1","sessionId":"s1","outcome":"allow"}"#))
     #expect(m.permissions.isEmpty)
 }
+
+@Test func markdownBlocks() {
+    let md = "# Plan\nFirst line\nsecond **bold**\n\n- one\n* two\n```swift\nlet x = 1\n  indented\n```\nafter\n```\nstreaming"
+    #expect(MarkdownBlock.parse(md) == [
+        .heading("Plan"),
+        .paragraph("First line\nsecond **bold**"),
+        .bullet("one"), .bullet("two"),
+        .code("let x = 1\n  indented"),
+        .paragraph("after"),
+        .code("streaming"),
+    ])
+}

@@ -42,13 +42,16 @@ public enum Shared {
 /// Small Codable values in the Keychain. With a shared access group the app and its widget both see them
 /// (free Apple IDs can't use App Groups, but keychain sharing works).
 public enum KeychainBox {
+    /// Turned off if the build lacks the keychain-sharing entitlement (e.g. unsigned simulator builds).
+    nonisolated(unsafe) private static var useGroup = true
+
     private static func query(_ account: String) -> [String: Any] {
         var q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Shared.keychainService,
             kSecAttrAccount as String: account,
         ]
-        if let g = Shared.keychainAccessGroup, !g.isEmpty, !g.hasPrefix("$(") { q[kSecAttrAccessGroup as String] = g }
+        if useGroup, let g = Shared.keychainAccessGroup, !g.isEmpty, !g.hasPrefix("$(") { q[kSecAttrAccessGroup as String] = g }
         return q
     }
 
@@ -57,7 +60,9 @@ public enum KeychainBox {
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
+        let status = SecItemCopyMatching(q as CFDictionary, &out)
+        if status == errSecMissingEntitlement, useGroup { useGroup = false; return load(type, account: account) }
+        guard status == errSecSuccess, let data = out as? Data else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
@@ -70,7 +75,9 @@ public enum KeychainBox {
         var add = q
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        let status = SecItemAdd(add as CFDictionary, nil)
+        if status == errSecMissingEntitlement, useGroup { useGroup = false; return save(value, account: account) }
+        return status == errSecSuccess
     }
 
     public static func delete(account: String) {

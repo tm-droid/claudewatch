@@ -250,7 +250,8 @@ public final class AppModel {
         case "hello":
             if let s = try? decoder.decode(RelayState.self, from: data) {
                 apply(s)
-                if let f = focused { Task { await loadFeed(f) } }
+                // Events may have been missed while disconnected: reload the focused feed in full.
+                if let f = focused { Task { await loadFeed(f, reset: true) } }
             }
         case "session":
             if let s = try? decoder.decode(SessionSummary.self, from: data) { upsert(s) }

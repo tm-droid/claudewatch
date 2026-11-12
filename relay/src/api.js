@@ -64,7 +64,8 @@ export class Auth {
     const h = req.headers.authorization || '';
     const given = Buffer.from(h.startsWith('Bearer ') ? h.slice(7) : '');
     const ok = given.length === this.token.length && crypto.timingSafeEqual(given, this.token);
-    if (!ok) {
+    // Stop recording once locked: keeps each list <= LOCK_FAILS and the map <= GLOBAL_LOCK_FAILS entries.
+    if (!ok && !this.locked(req)) {
       const k = this.client(req);
       this.fails.set(k, [...(this.fails.get(k) || []), this.now()]);
     }
