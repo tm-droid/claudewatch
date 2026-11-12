@@ -11,11 +11,12 @@ export const HOOK_EVENTS = {
   SessionEnd: { timeout: 2 },
 };
 
-export function hookUrl(port) {
-  return `http://127.0.0.1:${port}/hook`;
+export function hookUrl(port, secret) {
+  return `http://127.0.0.1:${port}/hook/${secret}`;
 }
 
-const isOurs = (h) => h?.type === 'http' && typeof h.url === 'string' && /^http:\/\/127\.0\.0\.1:\d+\/hook$/.test(h.url);
+const OURS = /^http:\/\/127\.0\.0\.1:\d+\/hook(\/[0-9a-f]+)?$/;
+const isOurs = (h) => h?.type === 'http' && typeof h.url === 'string' && OURS.test(h.url);
 
 /** Returns a new settings object with ClaudeWatch hooks removed. */
 export function removeHooks(settings) {
@@ -30,16 +31,16 @@ export function removeHooks(settings) {
   }
   if (!Object.keys(out.hooks).length) delete out.hooks;
   if (Array.isArray(out.allowedHttpHookUrls)) {
-    out.allowedHttpHookUrls = out.allowedHttpHookUrls.filter((u) => !/^http:\/\/127\.0\.0\.1:\d+\/hook$/.test(u));
+    out.allowedHttpHookUrls = out.allowedHttpHookUrls.filter((u) => !OURS.test(u));
   }
   return out;
 }
 
 /** Returns a new settings object with ClaudeWatch hooks added (idempotent; keeps the person's own hooks). */
-export function addHooks(settings, port) {
+export function addHooks(settings, port, secret) {
   const out = removeHooks(settings);
   out.hooks ||= {};
-  const url = hookUrl(port);
+  const url = hookUrl(port, secret);
   for (const [ev, { timeout, matcher }] of Object.entries(HOOK_EVENTS)) {
     const group = { hooks: [{ type: 'http', url, timeout }] };
     if (matcher) group.matcher = matcher;

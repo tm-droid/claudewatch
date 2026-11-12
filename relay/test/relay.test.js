@@ -179,12 +179,17 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
   const { root } = projectsDir();
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cwh-'));
   const relay = await startRelay(
-    { token: 't'.repeat(43), apiPort: 0, hookPort: 0, holdSeconds: 5, idleAwaySeconds: 1, awayMode: 'away', projectsDir: root, ntfy: { enabled: false } },
+    { token: 't'.repeat(43), hookSecret: 'abc123', apiPort: 0, hookPort: 0, holdSeconds: 5, idleAwaySeconds: 1, awayMode: 'away', projectsDir: root, ntfy: { enabled: false } },
     { log: () => {}, idle: async () => 0 },
   );
   try {
     const api = `http://127.0.0.1:${relay.api.address().port}`;
-    const hookUrl = `http://127.0.0.1:${relay.hook.address().port}/hook`;
+    const hookBase = `http://127.0.0.1:${relay.hook.address().port}/hook`;
+    const hookUrl = `${hookBase}/abc123`;
+    const J = { 'content-type': 'application/json' };
+    assert.equal((await fetch(hookBase, { method: 'POST', headers: J, body: '{}' })).status, 404);
+    assert.equal((await fetch(hookUrl, { method: 'POST', body: '{}' })).status, 404); // text/plain from a browser
+    assert.equal((await fetch(hookUrl, { method: 'POST', headers: { ...J, origin: 'https://evil.example' }, body: '{}' })).status, 404);
     const H = { authorization: 'Bearer ' + 't'.repeat(43), 'content-type': 'application/json' };
 
     assert.equal((await fetch(`${api}/api/state`)).status, 401);
@@ -202,7 +207,7 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
     };
     await waitFor('event: hello');
 
-    const hookResp = fetch(hookUrl, { method: 'POST', body: JSON.stringify({ session_id: 's1', hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'make' }, cwd: '/Users/me/proj/app' }) }).then((r) => r.json());
+    const hookResp = fetch(hookUrl, { method: 'POST', headers: J, body: JSON.stringify({ session_id: 's1', hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'make' }, cwd: '/Users/me/proj/app' }) }).then((r) => r.json());
     await waitFor('event: permission\n');
     const permId = JSON.parse(buf.split('event: permission\ndata: ')[1].split('\n')[0]).id;
     const r = await fetch(`${api}/api/permissions/${permId}`, { method: 'POST', headers: H, body: JSON.stringify({ behavior: 'allow' }) });
@@ -216,8 +221,9 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
     assert.equal(feed.hasMore, true);
 
     // Lockout after repeated bad tokens.
-    for (let i = 0; i < 10; i++) await fetch(`${api}/api/state`, { headers: { authorization: 'Bearer nope' } });
-    assert.equal((await fetch(`${api}/api/state`, { headers: H })).status, 429);
+    // Spoofed X-Forwarded-For prefixes don't dodge the per-client lockout.
+    for (let i = 0; i < 10; i++) await fetch(`${api}/api/state`, { headers: { authorization: 'Bearer nope', 'x-forwarded-for': `10.0.0.${i}, 1.2.3.4` } });
+    assert.equal((await fetch(`${api}/api/state`, { headers: { ...H, 'x-forwarded-for': '1.2.3.4' } })).status, 429);
   } finally {
     await relay.close();
     fs.rmSync(home, { recursive: true, force: true });
@@ -227,12 +233,12 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
 test('addHooks/removeHooks keep the person’s own hooks and are idempotent', async () => {
   const { addHooks, removeHooks } = await import('../src/install.js');
   const mine = { hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'echo hi' }] }], PreToolUse: [{ matcher: 'Read', hooks: [{ type: 'command', command: 'x' }] }] }, model: 'opus' };
-  const once = addHooks(mine, 7861);
-  const twice = addHooks(once, 7861);
+  const once = addHooks(mine, 7861, 'ff');
+  const twice = addHooks(once, 7861, 'ff');
   assert.deepEqual(once, twice);
   assert.equal(once.hooks.PreToolUse.length, 2);
   assert.equal(once.hooks.Stop[0].hooks[0].timeout, 600);
   assert.equal(once.allowedHttpHookUrls, undefined);
   assert.deepEqual(removeHooks(twice), mine);
-  assert.deepEqual(addHooks({ allowedHttpHookUrls: [] }, 7861).allowedHttpHookUrls, ['http://127.0.0.1:7861/hook']);
+  assert.deepEqual(addHooks({ allowedHttpHookUrls: [] }, 7861, 'ff').allowedHttpHookUrls, ['http://127.0.0.1:7861/hook/ff']);
 });

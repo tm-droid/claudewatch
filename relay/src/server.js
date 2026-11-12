@@ -22,7 +22,7 @@ export async function startRelay(cfg, { log = console.log, idle } = {}) {
   const ticker = setInterval(() => store.tick(), 5000);
 
   const api = createApiServer({ store, hooks, token: cfg.token, log });
-  const hook = createHookServer({ hooks, log });
+  const hook = createHookServer({ hooks, secret: cfg.hookSecret, log });
   await Promise.all([
     new Promise((r, j) => api.once('error', j).listen(cfg.apiPort, '127.0.0.1', r)),
     new Promise((r, j) => hook.once('error', j).listen(cfg.hookPort, '127.0.0.1', r)),

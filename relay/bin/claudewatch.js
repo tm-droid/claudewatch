@@ -106,15 +106,16 @@ const commands = {
 
   async install() {
     const cfg = loadConfig();
+    const s = newSecrets();
     if (!cfg.token) {
-      const s = newSecrets();
       cfg.token = s.token;
       cfg.ntfy = { ...cfg.ntfy, enabled: true, topic: s.ntfyTopic };
     }
+    cfg.hookSecret ||= s.hookSecret;
     saveConfig(cfg);
     say(`✓ Config: ${path.join(HOME, 'config.json')}`);
 
-    writeSettings(addHooks(readSettings(), cfg.hookPort));
+    writeSettings(addHooks(readSettings(), cfg.hookPort, cfg.hookSecret));
     say(`✓ Hooks added to ${SETTINGS} (backup: settings.json.claudewatch-backup)`);
 
     fs.mkdirSync(path.dirname(PLIST), { recursive: true });

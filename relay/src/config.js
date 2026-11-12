@@ -20,6 +20,7 @@ export const DEFAULTS = {
 export function newSecrets() {
   return {
     token: crypto.randomBytes(32).toString('base64url'),
+    hookSecret: crypto.randomBytes(24).toString('hex'),
     ntfyTopic: 'cw-' + crypto.randomBytes(12).toString('hex'),
   };
 }

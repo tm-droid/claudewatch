@@ -5,6 +5,7 @@ import { pubPermission } from './store.js';
 
 const MAX_BODY = 16 * 1024;
 const LOCK_FAILS = 10;
+const GLOBAL_LOCK_FAILS = 50;
 const LOCK_WINDOW_MS = 10 * 60_000;
 const HEARTBEAT_MS = 15_000;
 
@@ -43,14 +44,21 @@ export class Auth {
     this.now = now;
     this.fails = new Map(); // client -> [timestamps]
   }
+  // The proxy (Tailscale Funnel) appends the real peer last; earlier entries are client-controlled.
   client(req) {
-    return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    const xff = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return xff.at(-1) || req.socket.remoteAddress || '';
   }
   locked(req) {
     const t = this.now();
-    const list = (this.fails.get(this.client(req)) || []).filter((x) => t - x < LOCK_WINDOW_MS);
-    this.fails.set(this.client(req), list);
-    return list.length >= LOCK_FAILS;
+    let total = 0;
+    for (const [k, list] of this.fails) {
+      const live = list.filter((x) => t - x < LOCK_WINDOW_MS);
+      if (live.length) this.fails.set(k, live);
+      else this.fails.delete(k);
+      total += live.length;
+    }
+    return total >= GLOBAL_LOCK_FAILS || (this.fails.get(this.client(req)) || []).length >= LOCK_FAILS;
   }
   check(req) {
     const h = req.headers.authorization || '';
@@ -156,9 +164,16 @@ export function createApiServer({ store, hooks, token, log = () => {} }) {
   return server;
 }
 
-export function createHookServer({ hooks, log = () => {} }) {
+export function createHookServer({ hooks, secret, log = () => {} }) {
+  if (!secret) throw new Error('hook secret missing; run `claudewatch install` again');
+  const expected = Buffer.from(`/hook/${secret}`);
   return http.createServer(async (req, res) => {
-    if (req.method !== 'POST' || !req.url.startsWith('/hook')) return send(res, 404, {});
+    // Only Claude Code may call this: secret path, JSON body, and no browser Origin (blocks drive-by web pages).
+    const p = Buffer.from(req.url || '');
+    const pathOk = p.length === expected.length && crypto.timingSafeEqual(p, expected);
+    if (req.method !== 'POST' || !pathOk || req.headers.origin || !String(req.headers['content-type'] || '').startsWith('application/json')) {
+      return send(res, 404, {});
+    }
     try {
       const payload = await readBody(req);
       const out = await hooks.handle(payload);
