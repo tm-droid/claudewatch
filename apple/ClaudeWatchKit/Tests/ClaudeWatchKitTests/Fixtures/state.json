@@ -1,0 +1,37 @@
+{
+  "away": {
+    "mode": "auto",
+    "effective": false,
+    "idleSeconds": 0
+  },
+  "sessions": [
+    {
+      "id": "s1",
+      "project": "app",
+      "cwd": "/Users/me/proj/app",
+      "title": "Login fix",
+      "status": "running",
+      "lastActivity": 1794477611000,
+      "preview": "Fixed. Tests pass.",
+      "currentTool": null,
+      "canReply": true,
+      "stopRequested": false,
+      "queuedReplies": 0
+    }
+  ],
+  "permissions": [
+    {
+      "id": "p1",
+      "sessionId": "s1",
+      "project": "app",
+      "tool": "Bash",
+      "icon": "terminal",
+      "summary": "Run auth tests",
+      "detail": "npm test -- auth",
+      "ts": 1,
+      "remote": true,
+      "suggestions": []
+    }
+  ],
+  "serverTime": 1794477620000
+}

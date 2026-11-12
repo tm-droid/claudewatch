@@ -1,0 +1,130 @@
+{
+  "session": {
+    "id": "s1",
+    "project": "app",
+    "cwd": "/Users/me/proj/app",
+    "title": "Login fix",
+    "status": "running",
+    "lastActivity": 1794477611000,
+    "preview": "Fixed. Tests pass.",
+    "currentTool": null,
+    "canReply": true,
+    "stopRequested": false,
+    "queuedReplies": 0
+  },
+  "events": [
+    {
+      "id": "u1",
+      "seq": 1,
+      "ts": 1794477601000,
+      "kind": "prompt",
+      "text": "Fix the login bug in auth.js"
+    },
+    {
+      "id": "a1:0",
+      "seq": 2,
+      "ts": 1794477602000,
+      "kind": "thinking",
+      "text": "Let me look."
+    },
+    {
+      "id": "a2:0",
+      "seq": 3,
+      "ts": 1794477603000,
+      "kind": "text",
+      "text": "I'll check **auth.js** first."
+    },
+    {
+      "id": "toolu_1",
+      "seq": 4,
+      "ts": 1794477604000,
+      "kind": "tool",
+      "tool": {
+        "name": "Bash",
+        "icon": "terminal",
+        "summary": "Run auth tests",
+        "detail": "npm test -- auth",
+        "status": "error",
+        "result": "1 failing"
+      }
+    },
+    {
+      "id": "toolu_2",
+      "seq": 5,
+      "ts": 1794477606000,
+      "kind": "tool",
+      "tool": {
+        "name": "Edit",
+        "icon": "pencil",
+        "summary": "src/auth.js",
+        "detail": "- a < b\n+ a <= b",
+        "status": "ok",
+        "result": "Updated"
+      }
+    },
+    {
+      "id": "toolu_3",
+      "seq": 6,
+      "ts": 1794477608000,
+      "kind": "tool",
+      "tool": {
+        "name": "Agent",
+        "icon": "person.2",
+        "summary": "Review the fix",
+        "detail": "Review auth.js",
+        "status": "running",
+        "children": 2
+      }
+    },
+    {
+      "id": "u4",
+      "seq": 7,
+      "ts": 1794477609000,
+      "kind": "prompt",
+      "text": "/compact keep auth"
+    },
+    {
+      "id": "toolu_4",
+      "seq": 8,
+      "ts": 1794477610000,
+      "kind": "tool",
+      "tool": {
+        "name": "context-mode · ctx_search",
+        "icon": "puzzlepiece.extension",
+        "summary": "",
+        "detail": "{\n \"queries\": [\n  \"a\"\n ]\n}",
+        "status": "running"
+      }
+    },
+    {
+      "id": "a7:0",
+      "seq": 9,
+      "ts": 1794477611000,
+      "kind": "text",
+      "text": "Fixed. Tests pass."
+    },
+    {
+      "id": "toolu_9",
+      "seq": 10,
+      "ts": 1794477608600,
+      "kind": "tool",
+      "parent": "toolu_3",
+      "tool": {
+        "name": "Read",
+        "icon": "doc.text",
+        "summary": "src/auth.js",
+        "detail": "src/auth.js",
+        "status": "running"
+      }
+    },
+    {
+      "id": "g3:0",
+      "seq": 11,
+      "ts": 1794477608700,
+      "kind": "text",
+      "text": "Looks right.",
+      "parent": "toolu_3"
+    }
+  ],
+  "hasMore": false
+}

@@ -223,7 +223,8 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
     // Lockout after repeated bad tokens.
     // Spoofed X-Forwarded-For prefixes don't dodge the per-client lockout.
     for (let i = 0; i < 10; i++) await fetch(`${api}/api/state`, { headers: { authorization: 'Bearer nope', 'x-forwarded-for': `10.0.0.${i}, 1.2.3.4` } });
-    assert.equal((await fetch(`${api}/api/state`, { headers: { ...H, 'x-forwarded-for': '1.2.3.4' } })).status, 429);
+    assert.equal((await fetch(`${api}/api/state`, { headers: { authorization: 'Bearer nope', 'x-forwarded-for': '1.2.3.4' } })).status, 429);
+    assert.equal((await fetch(`${api}/api/state`, { headers: { ...H, 'x-forwarded-for': '1.2.3.4' } })).status, 200);
   } finally {
     await relay.close();
     fs.rmSync(home, { recursive: true, force: true });

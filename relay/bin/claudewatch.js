@@ -27,10 +27,16 @@ function readSettings() {
   }
 }
 
+// settings.json now holds the hook secret, so it and its backup are kept owner-only.
 function writeSettings(obj) {
-  if (fs.existsSync(SETTINGS)) fs.copyFileSync(SETTINGS, `${SETTINGS}.claudewatch-backup`);
+  const backup = `${SETTINGS}.claudewatch-backup`;
+  if (fs.existsSync(SETTINGS)) {
+    fs.copyFileSync(SETTINGS, backup);
+    fs.chmodSync(backup, 0o600);
+  }
   const tmp = SETTINGS + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n');
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { mode: 0o600 });
+  fs.chmodSync(tmp, 0o600);
   fs.renameSync(tmp, SETTINGS);
 }
 

@@ -102,8 +102,9 @@ export function createApiServer({ store, hooks, token, log = () => {} }) {
     try {
       if (url.pathname === '/api/health') return send(res, 200, { ok: true });
       if (parts[0] !== 'api') return send(res, 404, { error: 'not found' });
-      if (auth.locked(req)) return send(res, 429, { error: 'too many failed attempts, try later' });
+      // A valid token always gets in; the lockout only throttles wrong guesses.
       if (!auth.check(req)) {
+        if (auth.locked(req)) return send(res, 429, { error: 'too many failed attempts, try later' });
         log(`auth failed from ${auth.client(req)}`);
         return send(res, 401, { error: 'unauthorized' });
       }
@@ -171,7 +172,8 @@ export function createHookServer({ hooks, secret, log = () => {} }) {
     // Only Claude Code may call this: secret path, JSON body, and no browser Origin (blocks drive-by web pages).
     const p = Buffer.from(req.url || '');
     const pathOk = p.length === expected.length && crypto.timingSafeEqual(p, expected);
-    if (req.method !== 'POST' || !pathOk || req.headers.origin || !String(req.headers['content-type'] || '').startsWith('application/json')) {
+    const hostOk = /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(String(req.headers.host || ''));
+    if (req.method !== 'POST' || !pathOk || !hostOk || req.headers.origin || !String(req.headers['content-type'] || '').startsWith('application/json')) {
       return send(res, 404, {});
     }
     try {
