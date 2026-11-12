@@ -1,0 +1,10 @@
+{
+  "name": "claudewatch-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Relay that streams Claude Code sessions to the ClaudeWatch Apple Watch app",
+  "bin": { "claudewatch": "bin/claudewatch.js" },
+  "scripts": { "test": "node --test test/" },
+  "engines": { "node": ">=20" }
+}
