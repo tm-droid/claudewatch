@@ -31,7 +31,7 @@ struct SessionsView: View {
         .navigationDestination(for: String.self) { id in SessionView(sessionId: id) }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }
+                NavigationLink { SettingsView() } label: { Image(systemName: "gearshape").foregroundStyle(.white) }
                     .accessibilityLabel("Settings")
             }
         }

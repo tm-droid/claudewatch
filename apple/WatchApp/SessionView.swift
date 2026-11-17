@@ -41,10 +41,10 @@ struct SessionView: View {
         .navigationTitle(session?.project ?? "Session")
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
-                Button { replying = true } label: { Image(systemName: "mic.fill") }
+                Button { replying = true } label: { Image(systemName: "mic.fill").foregroundStyle(.white) }
                     .accessibilityLabel("Reply")
                 Spacer()
-                Button(role: .destructive) { confirmStop = true } label: { Image(systemName: "stop.fill") }
+                Button(role: .destructive) { confirmStop = true } label: { Image(systemName: "stop.fill").foregroundStyle(.white) }
                     .accessibilityLabel("Stop")
                     .disabled(session?.status != .running && session?.status != .listening && session?.status != .needsYou)
             }

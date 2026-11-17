@@ -193,7 +193,8 @@ export class Store extends EventEmitter {
     const now = this.now();
     const order = { needs_you: 0, listening: 1, running: 2, done: 3, idle: 4 };
     return [...this.sessions.values()]
-      .filter((s) => s.events.length || s.hooked)
+      // Hook-only sessions (claude -p, SDK runs, blank starts) show only while they need attention.
+      .filter((s) => s.events.length || (s.hooked && ['needs_you', 'listening', 'running'].includes(s.status)))
       .filter((s) => s.status !== 'idle' || now - s.lastActivity < LIST_WINDOW_MS)
       .map((s) => this.summary(s))
       .sort((a, b) => order[a.status] - order[b.status] || b.lastActivity - a.lastActivity);

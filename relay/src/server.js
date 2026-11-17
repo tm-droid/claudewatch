@@ -6,9 +6,9 @@ import { createApiServer, createHookServer } from './api.js';
 import { startAwayMonitor } from './away.js';
 import { makeNotifier } from './notify.js';
 
-export async function startRelay(cfg, { log = console.log, idle } = {}) {
+export async function startRelay(cfg, { log = console.log, idle, now } = {}) {
   if (!cfg.token) throw new Error('No token configured. Run `claudewatch install` first.');
-  const store = new Store();
+  const store = new Store(now ? { now } : undefined);
   const transcripts = new Transcripts(store, cfg.projectsDir);
   const notify = makeNotifier(cfg.ntfy, log);
   const hooks = new Hooks(store, {

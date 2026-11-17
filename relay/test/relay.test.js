@@ -167,6 +167,41 @@ test('reply while running is queued and delivered at Stop (at desk)', async () =
   assert.equal(hooks.reply('s1', 'late'), 'idle');
 });
 
+test('dropped hook request frees the permission and the Stop hold', async () => {
+  const { store, hooks, base } = hookSetup({ away: true });
+  await hooks.handle({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'hi' });
+  const ac = new AbortController();
+  const pending = hooks.handle({ ...base, hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'ls' } }, ac.signal);
+  await new Promise((r) => setImmediate(r));
+  const [p] = store.state().permissions;
+  ac.abort(); // answered at the Mac
+  assert.deepEqual(await pending, {});
+  assert.equal(store.state().permissions.length, 0);
+  assert.equal(hooks.decide(p.id, { behavior: 'allow' }), 'gone');
+
+  const ac2 = new AbortController();
+  const stop = hooks.handle({ ...base, hook_event_name: 'Stop' }, ac2.signal);
+  await new Promise((r) => setImmediate(r));
+  ac2.abort();
+  assert.deepEqual(await stop, {});
+  assert.notEqual(store.computeStatus(store.sessions.get('s1')), 'listening');
+});
+
+test('new prompt clears stale replies; no replies or listing for hook-only sessions without hooks', async () => {
+  const { store, hooks, base } = hookSetup();
+  await hooks.handle({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'hi' });
+  assert.equal(hooks.reply('s1', 'old note'), 'queued');
+  await hooks.handle({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'next' }); // Esc, then typed at the Mac
+  assert.deepEqual(await hooks.handle({ ...base, hook_event_name: 'Stop' }), {});
+
+  store.session('t1'); // transcript-only session (no hooks)
+  store.touch(store.sessions.get('t1'));
+  assert.equal(hooks.reply('t1', 'hello'), 'idle');
+
+  await hooks.handle({ ...base, session_id: 'p1', hook_event_name: 'SessionStart' }); // claude -p start, no events
+  assert.ok(!store.listSessions().some((x) => x.id === 'p1'));
+});
+
 test('stop request halts at next tool hook', async () => {
   const { hooks, base } = hookSetup();
   await hooks.handle({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'hi' });
@@ -180,7 +215,7 @@ test('API: auth, lockout, state, stream, permission round trip over HTTP', async
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cwh-'));
   const relay = await startRelay(
     { token: 't'.repeat(43), hookSecret: 'abc123', apiPort: 0, hookPort: 0, holdSeconds: 5, idleAwaySeconds: 1, awayMode: 'away', projectsDir: root, ntfy: { enabled: false } },
-    { log: () => {}, idle: async () => 0 },
+    { log: () => {}, idle: async () => 0, now: () => Date.parse('2026-11-12T10:00:20Z') },
   );
   try {
     const api = `http://127.0.0.1:${relay.api.address().port}`;

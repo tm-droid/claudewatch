@@ -157,8 +157,11 @@ struct PhoneHomeView: View {
         }
         .navigationTitle("ClaudeWatch")
         .refreshable { try? await model.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: PairingSync.didChange)) { _ in
+            watchStatus = PairingSync.shared.watchStatus
+        }
         .confirmationDialog("Unpair this iPhone?", isPresented: $confirmUnpair) {
-            Button("Unpair", role: .destructive) { model.unpair() }
+            Button("Unpair", role: .destructive) { model.unpair(); PairingSync.shared.clear() }
         }
     }
 

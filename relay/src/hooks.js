@@ -20,7 +20,16 @@ export class Hooks {
     });
   }
 
-  async handle(p) {
+  /** Free anything held for this session: a Stop hold, permission waiters and queued replies. */
+  release(id) {
+    this.listeners.get(id)?.(null);
+    for (const p of this.store.permissions.values()) if (p.sessionId === id && p.waiter) p.waiter(null);
+    const s = this.store.sessions.get(id);
+    if (s) s.replies = [];
+  }
+
+  /** `signal` aborts when Claude Code drops the hook request (answered at the Mac, Ctrl-C, exit). */
+  async handle(p, signal) {
     const id = p.session_id;
     if (!id) return {};
     const ev = p.hook_event_name;
@@ -33,6 +42,8 @@ export class Hooks {
         this.store.hook(id, 'done', extra);
         return {};
       case 'UserPromptSubmit':
+        // A new prompt means any earlier hold or queued reply is stale.
+        this.release(id);
         s.stopRequested = false;
         this.store.clearPermissions(id);
         this.store.hook(id, 'running', { ...extra, currentTool: null });
@@ -51,7 +62,7 @@ export class Hooks {
         this.store.hook(id, 'running', { ...extra, currentTool: null });
         return {};
       case 'PermissionRequest':
-        return this.permission(p);
+        return this.permission(p, signal);
       case 'Notification':
         if (p.notification_type === 'permission_prompt' && ![...this.store.permissions.values()].some((x) => x.sessionId === id)) {
           // Hosts that skip PermissionRequest (e.g. SDK canUseTool) still tell us someone is needed.
@@ -62,8 +73,9 @@ export class Hooks {
         }
         return {};
       case 'Stop':
-        return this.stop(p);
+        return this.stop(p, signal);
       case 'SessionEnd':
+        this.release(id);
         this.store.clearPermissions(id, 'session_ended');
         this.store.hook(id, 'ended', { currentTool: null });
         return {};
@@ -79,7 +91,7 @@ export class Hooks {
     return { continue: false, stopReason: STOP_REASON };
   }
 
-  async permission(p) {
+  async permission(p, signal) {
     const id = p.session_id;
     const s = this.store.session(id);
     const card = toolCard(p.tool_name, p.tool_input, p.cwd);
@@ -99,13 +111,16 @@ export class Hooks {
         clearTimeout(timer);
         resolve(d);
       };
+      signal?.addEventListener('abort', () => perm.waiter?.(null), { once: true });
       this.store.addPermission(perm);
       this.notify({ title: `${s.project || 'Claude'} needs permission`, body: `${card.tool}: ${card.summary}`.slice(0, 120), priority: 'high', tags: 'warning' });
     });
     if (!decision) {
-      // Timed out or person came back to the Mac: hand over to the normal dialog.
       delete perm.waiter;
-      this.store.updatePermission(perm.id, {});
+      // Claude Code dropped the request (answered at the Mac, Ctrl-C): nothing left to answer.
+      if (signal?.aborted) this.store.resolvePermission(perm.id, 'answered_at_mac');
+      // Timed out or person came back to the Mac: hand over to the normal dialog.
+      else this.store.updatePermission(perm.id, {});
       return {};
     }
     this.store.resolvePermission(perm.id, decision.behavior);
@@ -130,7 +145,7 @@ export class Hooks {
     return 'ok';
   }
 
-  async stop(p) {
+  async stop(p, signal) {
     const id = p.session_id;
     const s = this.store.session(id);
     this.store.clearPermissions(id);
@@ -152,6 +167,7 @@ export class Hooks {
         clearTimeout(timer);
         resolve(r);
       });
+      signal?.addEventListener('abort', () => this.listeners.get(id)?.(null), { once: true });
       this.store.setListening(id, true);
     });
     this.listeners.delete(id);
@@ -174,6 +190,8 @@ export class Hooks {
   reply(id, text) {
     const s = this.store.sessions.get(id);
     if (!s) return 'idle';
+    // Replies only reach Claude through the Stop hook; sessions without hooks would queue forever.
+    if (!s.hooked) return 'idle';
     const l = this.listeners.get(id);
     if (l) {
       l(text);

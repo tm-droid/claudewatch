@@ -91,6 +91,7 @@ public final class AppModel {
     // MARK: lifecycle
 
     public func pair(_ p: Pairing) {
+        guard p != pairing else { return }
         PairingStore.save(p)
         pairing = p
         client = APIClient(pairing: p)
@@ -173,7 +174,11 @@ public final class AppModel {
     public func loadFeed(_ id: String, reset: Bool = false) async {
         guard let client else { return }
         guard let page = try? await client.feed(id, thinking: showThinking) else { return }
-        if reset { feeds[id] = [] }
+        // Keep events streamed in while the page was loading; drop the rest, the page replaces them.
+        if reset {
+            let newest = page.events.map(\.seq).max() ?? -1
+            feeds[id] = (feeds[id] ?? []).filter { $0.seq > newest }
+        }
         merge(id, page.events)
         if reset || hasMore[id] == nil { hasMore[id] = page.hasMore }
         upsert(page.session)

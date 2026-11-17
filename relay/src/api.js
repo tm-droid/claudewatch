@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 import { pubPermission } from './store.js';
 
 const MAX_BODY = 16 * 1024;
+// Hook payloads carry full tool input/output (e.g. a whole file for Write); loopback only.
+const MAX_HOOK_BODY = 16 * 1024 * 1024;
 const LOCK_FAILS = 10;
 const GLOBAL_LOCK_FAILS = 50;
 const LOCK_WINDOW_MS = 10 * 60_000;
@@ -15,13 +17,13 @@ function send(res, code, obj) {
   res.end(body);
 }
 
-function readBody(req) {
+function readBody(req, max = MAX_BODY) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
     req.on('data', (c) => {
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > max) {
         reject(Object.assign(new Error('body too large'), { code: 413 }));
         req.destroy();
       } else chunks.push(c);
@@ -178,8 +180,10 @@ export function createHookServer({ hooks, secret, log = () => {} }) {
       return send(res, 404, {});
     }
     try {
-      const payload = await readBody(req);
-      const out = await hooks.handle(payload);
+      const payload = await readBody(req, MAX_HOOK_BODY);
+      const dropped = new AbortController();
+      res.on('close', () => { if (!res.writableFinished) dropped.abort(); });
+      const out = await hooks.handle(payload, dropped.signal);
       if (Object.keys(out).length) log(`hook ${payload.hook_event_name} -> ${JSON.stringify(out).slice(0, 160)}`);
       send(res, 200, out);
     } catch (e) {

@@ -41,7 +41,13 @@ struct ClaudeWatchApp: App {
                         WKInterfaceDevice.current().play(.success)
                     }
                 }
+                // Developer install path: `devicectl device process launch … -- -cwPairLink '<link>'`
+                // (launch arguments need developer access to this watch, unlike a tapped URL).
+                if model.pairing == nil, let link = UserDefaults.standard.string(forKey: "cwPairLink"), let p = Pairing(link: link) {
+                    model.pair(p)
+                }
                 PairingSync.shared.onReceive = { model.pair($0) }
+                PairingSync.shared.onUnpair = { model.unpair() }
                 PairingSync.shared.activate()
             }
             .onChange(of: showThinking) { _, v in model.showThinking = v }
